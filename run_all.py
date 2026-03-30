@@ -3,6 +3,15 @@ import numpy as np
 import os
 import subprocess
 import shutil
+from pathlib import Path
+
+
+# definindo caminhos
+BASE_DIR = Path(".")
+DATA_RAW = BASE_DIR / "data" / "raw"
+PROCESSING_DIR = BASE_DIR / "data" / "processing"
+RESULTS_DIR = BASE_DIR / "results"
+
 
 def process_fitbit_data(hr_file, st_file, output_file):
     """
@@ -40,8 +49,7 @@ def process_fitbit_data(hr_file, st_file, output_file):
     # pegando primeira coluna do dataframe merge
     final['Datetime'] = merged['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
     
-    # --- LÓGICA DE ARREDONDAMENTO PARA CIMA (.5 -> 1) ---
-    # Somamos 0.5 e usamos floor para garantir que 62.5 vire 63 e 62.4 vire 62
+    # arredondando para cima - para ficar igual ao exemplo
     final['HR_Value'] = np.floor(merged['heartrate'] + 0.5).astype(int)
     
     final['f0_'] = final['Datetime']
@@ -50,49 +58,140 @@ def process_fitbit_data(hr_file, st_file, output_file):
     final.to_csv(output_file, index=False)
     return output_file
 
-def run_patient_process(patient_id):
+
+def process_applewatch_data(hr_in, st_in, hr_out, st_out):
     """
-    Executa o NightSignal para um paciente específico.
+    Formata os arquivos NonFitbit para o padrão Apple Watch exigido pelo NightSignal.
     """
-    hr_file = f"{patient_id}-hr.csv"
-    st_file = f"{patient_id}-st.csv"
-    unified_file = f"{patient_id}_rhr_temp.csv"
-
-    if not os.path.exists(hr_file) or not os.path.exists(st_file):
-        return
-
-    print(f">>> Processando Paciente: {patient_id}")
-
-    # Processamento com a nova regra de arredondamento
-    process_fitbit_data(hr_file, st_file, unified_file)
-
-    # Execução do NightSignal
-    command = [
-        "python3", "nightsignal.py",
-        "--device=Fitbit",
-        f"--restinghr={unified_file}"
-    ]
-    subprocess.run(command, capture_output=True, text=True)
-
-    # Organização de arquivos
-    if os.path.exists("NS-signals.json"):
-        shutil.move("NS-signals.json", f"{patient_id}_signals.json")
-    if os.path.exists("NightSignalResult.pdf"):
-        shutil.move("NightSignalResult.pdf", f"{patient_id}_plot.pdf")
-
-    if os.path.exists(unified_file):
-        os.remove(unified_file)
+    # batimentos
+    df_hr = pd.read_csv(hr_in)
+    df_hr['datetime'] = pd.to_datetime(df_hr['datetime'])
     
-    print(f">>> Finalizado: {patient_id}\n")
+    hr_final = pd.DataFrame()
+    hr_final['Device'] = df_hr['device']
+    hr_final['Start_Date'] = df_hr['datetime'].dt.strftime('%Y-%m-%d')
+    hr_final['Start_Time'] = df_hr['datetime'].dt.strftime('%H:%M:%S')
+    hr_final['Heartrate'] = df_hr['heartrate']
+    
+    hr_final.to_csv(hr_out, index=False)
+
+    # passos
+    df_st = pd.read_csv(st_in)
+    df_st['start_datetime'] = pd.to_datetime(df_st['start_datetime'])
+    df_st['end_datetime'] = pd.to_datetime(df_st['end_datetime'])
+    
+    st_final = pd.DataFrame()
+    st_final['Device'] = df_st['device']
+    st_final['Start_Date'] = df_st['start_datetime'].dt.strftime('%Y-%m-%d')
+    st_final['Start_Time'] = df_st['start_datetime'].dt.strftime('%H:%M:%S')
+    st_final['End_Date'] = df_st['end_datetime'].dt.strftime('%Y-%m-%d')
+    st_final['End_Time'] = df_st['end_datetime'].dt.strftime('%H:%M:%S')
+    st_final['Steps'] = df_st['steps']
+    
+    st_final.to_csv(st_out, index=False)
+
+def run_patient_process(patient_folder):
+    """
+    Execução do algoritmo para um paciente específico.
+    """
+    
+    patient_id = patient_folder.name  # nome da pasta da base é o ID do paciente
+    
+    # esse é o padrão para dados da FitBit
+    hr_file_fitbit = patient_folder / "Orig_Fitbit_HR.csv"
+    st_file_fitbit = patient_folder / "Orig_Fitbit_ST.csv"
+    unified_file_fitbit = BASE_DIR / f"{patient_id}_rhr_temp.csv" # arquivo temporário para o processamento, dados unificados
+
+    # esse é o padrão para dados da nonFitBit
+    hr_file_nonfitbit = patient_folder / "Orig_NonFitbit_HR.csv"
+    st_file_nonfitbit = patient_folder / "Orig_NonFitbit_ST.csv"
+    
+    # criando pastas de resultados e processamento para o paciente
+    patient_dir = RESULTS_DIR / patient_id
+    patient_dir.mkdir(parents=True, exist_ok=True)
+        
+    # define o caminho para os arquivos temporários
+    patient_dir_temp = PROCESSING_DIR / patient_id
+    patient_dir_temp.mkdir(parents=True, exist_ok=True)
+    
+    if hr_file_fitbit.exists() and st_file_fitbit.exists():
+    
+        print(f"Processando Paciente FitBit: {patient_id}")
+
+        # processando cada paciente
+        process_fitbit_data(hr_file_fitbit, st_file_fitbit, unified_file_fitbit)
+
+        # executando algoritmo
+        command = [
+            "python3", "nightsignal.py",
+            "--device=Fitbit",
+            f"--restinghr={unified_file_fitbit}"
+        ]
+        subprocess.run(command, capture_output=True, text=True)
+        
+    elif hr_file_nonfitbit.exists() and st_file_nonfitbit.exists():
+        print(f"Paciente NonFitBit: {patient_id}")
+        
+    
+        # device_name = identify_device(nonfitbit_hr)
+        
+        # if device_name and "Apple Watch" in device_name:
+        #     print(f"Processando Paciente NonFitBit: {patient_id}")
+            
+        #     temp_hr = BASE_DIR / f"{patient_id}_apple_hr.csv"
+        #     temp_st = BASE_DIR / f"{patient_id}_apple_st.csv"
+            
+        #     process_applewatch_data(hr_file_nonfitbit, st_file_nonfitbit, temp_hr, temp_st)
+            
+        #     # Executa NightSignal com os dois arquivos
+        #     cmd = ["python3", "nightsignal.py", "--device=AppleWatch", 
+        #            f"--restinghr={temp_hr}", f"--steps={temp_st}"]
+        #     subprocess.run(cmd, capture_output=True, text=True)
+
+        # # definindo arquivos de saída temporários para o formato Apple Watch
+        # hr_out = patient_dir_temp / f"{patient_id}_hr_apple.csv"
+        # st_out = patient_dir_temp / f"{patient_id}_st_apple.csv"
+
+        # # processando cada paciente
+        # process_applewatch_data(hr_file_nonfitbit, st_file_nonfitbit, hr_out, st_out)
+
+        # # executando algoritmo
+        # command = [
+        #     "python3", "nightsignal.py",
+        #     "--device=AppleWatch",
+        #     f"--restinghr={hr_out}",
+        #     f"--steps={st_out}"
+        # ]
+        # subprocess.run(command, capture_output=True, text=True)
+
+    # organizando arquivos gerados
+    if os.path.exists("NS-signals.json"):
+        shutil.move("NS-signals.json", patient_dir / f"{patient_id}_signals.json")
+    
+    if os.path.exists("NightSignalResult.pdf"):
+        shutil.move("NightSignalResult.pdf", patient_dir / f"{patient_id}_plot.pdf")
+        
+    # move os arquivos temporários 
+    if os.path.exists(unified_file_fitbit):
+        shutil.move(unified_file_fitbit, patient_dir_temp / f"{patient_id}_temp.csv")
+
+    
+    print(f"Finalizado: {patient_id}\n")
 
 def main():
-    all_files = os.listdir('.')
-    patient_ids = sorted(list(set(f.split("-")[0] for f in all_files if f.endswith("-hr.csv"))))
+    """
+    Percorre a pasta data/raw procurando subpastas de pacientes.
+    Para cada paciente encontrado, executa o processo de unificação dos dados e o algoritmo.
+    """
+    
+    # lista todas as subpastas em data/raw/
+    patient_folders = [f for f in DATA_RAW.iterdir() if f.is_dir()]
+    
+    print(f"Encontradas {len(patient_folders)} pastas de pacientes em data/raw/.\n")
 
-    print(f"Iniciando processamento de {len(patient_ids)} pacientes com arredondamento 'Round Half Up'.\n")
-
-    for pid in patient_ids:
-        run_patient_process(pid)
+    # envia para a função cada pasta de paciente
+    for folder in sorted(patient_folders):
+        run_patient_process(folder)
 
 if __name__ == "__main__":
     main()

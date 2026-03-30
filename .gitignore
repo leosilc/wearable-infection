@@ -1,9 +1,5 @@
 # Dados (pastas com datasets)
 data/
-temporario/
-
-# Código fonte ou dependências locais
-source/
 
 # Configurações de ambiente Python (pyenv)
 .python-version
