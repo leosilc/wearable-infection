@@ -16,8 +16,8 @@ from datetime import date, timedelta
 os.chdir(".")
 
 
-### EXAMPLE RUN: python3 nighsignal.py --device=AppleWatch --heartrate=P355472-AppleWatch-hr.csv  --step=P355472-AppleWatch-st.csv
-### EXAMPLE RUN: python3 nighsignal.py --device=Fitbit --restinghr=P682517-Fitbit-rhr.csv
+### EXAMPLE RUN: python3 nightsignal.py --device=AppleWatch --heartrate=P355472-AppleWatch-hr.csv  --step=P355472-AppleWatch-st.csv
+### EXAMPLE RUN: python3 nightsignal.py --device=Fitbit --restinghr=P682517-Fitbit-rhr.csv
 
 
 #functions
@@ -47,7 +47,7 @@ font = {'family' : 'sans-serif',
 plt.rc('font', **font)
 plt.rc('xtick',labelsize=8)
 plt.rc('ytick',labelsize=10)
-plt.style.use('seaborn-dark-palette')
+# plt.style.use('seaborn-dark-palette') # comentado pois não conseguia usar essa bib
 
 
 full_cmd_arguments = sys.argv
@@ -670,5 +670,7 @@ if (len(date_hr_avgs_dic.keys())>1):
     figure = plt.gcf()
     figure.set_size_inches(16, 2.5)
 
-    plt.savefig("NightSignalResult" +'.pdf', dpi=300, bbox_inches = "tight")
+    plt.savefig("NightSignalResult" +'.pdf', dpi=300, bbox_inches = "tight") # organizar os resultados numa pasta, diretorios, comando python por meio de scrip para chamar o arquivo atual importando suas funcoes
     plt.close()
+
+# definindo path, separando data em pastas
