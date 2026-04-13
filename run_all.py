@@ -5,7 +5,6 @@ import subprocess
 import shutil
 from pathlib import Path
 
-
 # definindo caminhos
 BASE_DIR = Path(".")
 DATA_RAW = BASE_DIR / "data" / "raw"

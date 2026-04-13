@@ -1,7 +1,7 @@
 # wearable-infection
 Real-time detection of infection diseases using wearables
 
-
+COMEÇAR COM pyenv activate ic
 
 <img src="images/NightSignal_Icon.png" width="272.8" height="262.4">
 
