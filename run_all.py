@@ -6,10 +6,10 @@ import shutil
 from pathlib import Path
 
 # definindo caminhos
-BASE_DIR = Path(".")
-DATA_RAW = BASE_DIR / "data" / "raw"
-PROCESSING_DIR = BASE_DIR / "data" / "processing"
-RESULTS_DIR = BASE_DIR / "results"
+# BASE_DIR = Path(".")
+DATA_RAW = Path("data")
+PROCESSING_DIR = Path("data/processing")
+RESULTS_DIR = Path("results")
 
 
 def process_fitbit_data(hr_file, st_file, output_file):

@@ -1,5 +1,6 @@
 # Dados (pastas com datasets)
 data/
+results/
 
 # Configurações de ambiente Python (pyenv)
 .python-version
@@ -7,4 +8,3 @@ data/
 # Arquivos de sistema e cache (recomendado adicionar)
 __pycache__/
 *.pyc
-.ipynb_checkpoints/

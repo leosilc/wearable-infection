@@ -113,9 +113,24 @@ if(device=="Fitbit"):
         temp = date_hrs_dic[key]
         numOfHRs = str(temp).count("*") + 1
         hrs = temp.split("*")
-        for hr in hrs:
-            AVGHR = AVGHR + int(float(hr))
-        AVGHR = int(AVGHR/numOfHRs)
+
+
+
+        # for hr in hrs:
+        #     AVGHR = AVGHR + int(float(hr))
+        # AVGHR = int(AVGHR/numOfHRs)
+
+        # ALTERAÇÃO PARA FUNCIONAR COM DADOS AUSENTES
+        valid_hrs = [
+            int(float(hr)) for hr in hrs
+            if hr.strip() not in ('', 'nan', 'NaN')
+        ]
+        if not valid_hrs:
+            continue
+        AVGHR = int(sum(valid_hrs) / len(valid_hrs))
+
+
+
         date_hr_avgs_dic[key] = AVGHR
                         
     missed_days_avg_dic = {}
@@ -353,9 +368,25 @@ else:
         temp = date_hrs_dic[key]
         numOfHRs = str(temp).count("*") + 1
         hrs = temp.split("*")
-        for hr in hrs:
-            AVGHR = AVGHR + int(float(hr))
-        AVGHR = int(AVGHR/numOfHRs)
+
+
+
+
+        # for hr in hrs:
+        #     AVGHR = AVGHR + int(float(hr))
+        # AVGHR = int(AVGHR/numOfHRs)
+
+        # ALTERAÇÃO PARA FUNCIONAR COM DADOS AUSENTES
+        valid_hrs = [
+            int(float(hr)) for hr in hrs
+            if hr.strip() not in ('', 'nan', 'NaN')
+        ]
+        if not valid_hrs:
+            continue
+        AVGHR = int(sum(valid_hrs) / len(valid_hrs))
+        
+
+
         date_hr_avgs_dic[key] = AVGHR
 
     missed_days_avg_dic = {}

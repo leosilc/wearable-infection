@@ -1,0 +1,25 @@
+Metadata-Version: 2.1
+Name: pyampute
+Version: 0.0.3
+Summary: Transformer for generating multivariate missingness in complete datasets
+Home-page: UNKNOWN
+Author: Rianne Schouten,Davina Zamanzadeh,Prabhant Singh
+Author-email: r.m.schouten@tue.nl,davzaman@gmail.com,p.singh@tue.nl
+License: BSD
+Project-URL: Documentation, https://rianneschouten.github.io/pyampute/build/html/index.html
+Project-URL: Source Code, https://github.com/RianneSchouten/pyampute
+Platform: UNKNOWN
+License-File: LICENSE.md
+Requires-Dist: pandas
+Requires-Dist: numpy (>=1.19.0)
+Requires-Dist: scipy
+Requires-Dist: matplotlib (>=3.4.0)
+Requires-Dist: scikit-learn
+Provides-Extra: docs
+Requires-Dist: sphinx ; extra == 'docs'
+Requires-Dist: pydata-sphinx-theme ; extra == 'docs'
+Requires-Dist: sphinx-autodoc-typehints ; extra == 'docs'
+Requires-Dist: sphinx-gallery ; extra == 'docs'
+
+Amputation is the opposite of imputation; it is the creation of a missing data mask for complete datasets. Amputation is useful for evaluating the effect of missing values on the outcome of a statistical or machine learning model. ``pyampute`` is the first open-source Python library for data amputation. Our package is compatible with the scikit-learn-style fit and transform paradigm, which allows for seamless integration of amputation in a larger, more complex data processing pipeline.
+
