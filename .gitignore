@@ -2,6 +2,9 @@
 data/
 results/
 
+# Ambiente virtual
+teste_mdatagen/
+
 # Configurações de ambiente Python (pyenv)
 .python-version
 
