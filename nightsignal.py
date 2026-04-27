@@ -126,6 +126,7 @@ if(device=="Fitbit"):
             if hr.strip() not in ('', 'nan', 'NaN')
         ]
         if not valid_hrs:
+            print(f"  [AVISO] Data {key} tem apenas valores ausentes ou inválidos. Ignorando esta data para cálculo de média.")
             continue
         AVGHR = int(sum(valid_hrs) / len(valid_hrs))
 
