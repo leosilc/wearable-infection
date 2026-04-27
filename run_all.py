@@ -6,8 +6,8 @@ import shutil
 from pathlib import Path
 
 # definindo caminhos
-# BASE_DIR = Path(".")
-DATA_RAW = Path("data")
+BASE_DIR = Path(".")
+DATA_RAW = Path("data/raw")
 PROCESSING_DIR = Path("data/processing")
 RESULTS_DIR = Path("results")
 

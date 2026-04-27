@@ -52,18 +52,26 @@ COLUNA_HR = "HR_Value"
 # FUNÇÕES
 # =============================================================================
 
-def salvar_original(csv_entrada: Path, patient_id: str):
-    """
-    Copia o CSV original para data/missing/original/
-    Serve como referência para comparar os resultados depois.
-    Só faz a cópia uma vez — se já existir, pula.
-    """
-    destino = MISSING_DIR / "original" / patient_id / csv_entrada.name
-    if destino.exists():
-        return  # já copiado em execução anterior
+# def salvar_original(csv_entrada: Path, patient_id: str):
+#     """
+#     Copia o CSV original para data/missing/original/
+#     Serve como referência para comparar os resultados depois.
+#     Só faz a cópia uma vez — se já existir, pula.
+#     """
+#     destino = MISSING_DIR / "original" / patient_id / csv_entrada.name
+#     if destino.exists():
+#         return  # já copiado em execução anterior
 
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(csv_entrada, destino)
+#     df = pd.read_csv(csv_entrada)
+
+#     df["HR_MISSING"] = df[COLUNA_HR].astype(float)  # cópia da coluna original para referência
+#     df["ST_MISSING"] = df["ST_Value"].astype(float)  # garantir que Steps também é float
+
+#     destino.parent.mkdir(parents=True, exist_ok=True)
+
+#     df.to_csv(destino, index=False)  # salva o CSV com a coluna de referência
+
+#     # shutil.copy2(csv_entrada, destino)
 
 
 def aplicar_mcar(df: pd.DataFrame, taxa: int) -> pd.DataFrame:
@@ -93,6 +101,13 @@ def aplicar_mcar(df: pd.DataFrame, taxa: int) -> pd.DataFrame:
 
     # .random() É o método que gera os NaNs e os RETORNA num novo DataFrame.
     X_com_ausencia = gerador.random()
+
+
+    #adicionando a coluna de Steps e Batimentos ao final
+    df_out["HR_MISSING"] = df[COLUNA_HR].astype(float)  # cópia da coluna original para referência
+    df_out["ST_MISSING"] = df["ST_Value"].astype(float)  # garantir que Steps também é float
+
+
 
     # Substitui a coluna HR no DataFrame completo
     df_out[COLUNA_HR] = X_com_ausencia[COLUNA_HR].values
@@ -144,9 +159,9 @@ def processar_paciente(patient_id: str, csv_entrada: Path):
     total_linhas = len(df)
     print(f"  {total_linhas} linhas carregadas de {csv_entrada}")
 
-    # Salva cópia do original (referência para comparação futura)
-    salvar_original(csv_entrada, patient_id)
-    print(f"  Original copiado para: data/missing/original/{patient_id}/")
+    # # Salva cópia do original (referência para comparação futura)
+    # salvar_original(csv_entrada, patient_id)
+    # print(f"  Original copiado para: data/missing/original/{patient_id}/")
 
     # Gera um CSV para cada taxa
     for taxa in TAXAS:

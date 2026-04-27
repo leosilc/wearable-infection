@@ -5,6 +5,7 @@ import os
 remover1 = 'processing'
 remover2 = 'results'
 remover3 = 'data/processing'
+remover4 = 'data/missing'
 
 
 def limpar_pasta(caminho_pasta):
@@ -30,4 +31,9 @@ if __name__ == "__main__":
     if os.path.exists(remover3):
         limpar_pasta(remover3)
         print(f'Pasta "{remover3}" limpa com sucesso.')
+
+    if os.path.exists(remover4):
+        limpar_pasta(remover4)
+        print(f'Pasta "{remover4}" limpa com sucesso.')
+
     
