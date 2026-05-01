@@ -15,7 +15,7 @@ MISSING_DIR = Path("data/missing")
 RESULTS_DIR = Path("results")
 
 # Taxas de ausência que serão geradas
-TAXAS = [10]
+TAXAS = [10, 20, 30]
 
 SEED = 42
 
