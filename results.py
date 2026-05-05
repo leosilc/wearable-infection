@@ -1,5 +1,8 @@
 import json
 from pathlib import Path
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 RESULTS_DIR = Path("results")
 MISSING_DIR = RESULTS_DIR / "missing" 
@@ -24,6 +27,7 @@ def metrics(original: dict[str, str], missing: dict[str, str]) -> tuple[list[lis
         "precision_alert": 0,
         "recall_warning": 0,
         "recall_alert": 0,
+        "recall_both": 0,
         "accuracy": 0
     }
 
@@ -48,8 +52,15 @@ def metrics(original: dict[str, str], missing: dict[str, str]) -> tuple[list[lis
     metrics_calculated["recall_alert"] = safe_div(
         len(matriz[2][2]), sum(len(matriz[i][2]) for i in range(3))
     )
+
+    # mudar nome
+    metrics_calculated["recall_both"] = safe_div(
+        (len(matriz[1][0]) + len(matriz[2][0])), (len(matriz[1][1]) + len(matriz[2][2]))
+    )
+    
+    
     metrics_calculated["accuracy"] = safe_div(
-        len(matriz[0][0]) + len(matriz[1][1]) + len(matriz[2][2]),
+        len(matriz[1][1]) + len(matriz[2][2]),
         sum(len(matriz[i][j]) for i in range(3) for j in range(3)) - len(matriz[0][0]),
     )
 
@@ -92,6 +103,7 @@ def formatar_relatorio(
     linhas.append(f"  Precisao Vermelho  : {format(mc['precision_alert'])}")
     linhas.append(f"  Recall Amarelo     : {format(mc['recall_warning'])}")
     linhas.append(f"  Recall Vermelho    : {format(mc['recall_alert'])}")
+    linhas.append(f"  Recall Ambos       : {format(mc['recall_both'])}")
  
     perdidos_alerta  = matriz[2][0]
     perdidos_warning = matriz[1][0]
@@ -109,6 +121,9 @@ def formatar_relatorio(
  
     linhas.append("\n" + "-" * 60)
     return "\n".join(linhas)
+
+def plot(patients: list[Path])
+    # plotar o boxplot de cada paciente, comparando as métricas entre os mecanismos e taxas
 
 
 
