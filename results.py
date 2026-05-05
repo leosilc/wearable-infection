@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import csv
 
 RESULTS_DIR = Path("results")
 MISSING_DIR = RESULTS_DIR / "missing" 
@@ -122,8 +123,23 @@ def formatar_relatorio(
     linhas.append("\n" + "-" * 60)
     return "\n".join(linhas)
 
-def plot(patients: list[Path])
+def plot(df: pd.DataFrame):
     # plotar o boxplot de cada paciente, comparando as métricas entre os mecanismos e taxas
+
+    sns.boxplot(data=df, x="rate", y="accuracy", palette="viridis")
+    
+    # Adiciona os pontinhos de cada paciente para mostrar a dispersão
+    sns.stripplot(data=df, x="rate", y="accuracy", color="black", alpha=0.3)
+
+    plt.title("NightSignal...")
+    plt.ylabel("Acurácia (0.0 a 1.0)")
+    plt.xlabel("Taxa de Dados Faltantes")
+    plt.ylim(0, 1.05) # Garante que o gráfico mostre de 0 a 100%
+    
+    plt.savefig("grafico_acuracia.png")
+    plt.show()
+    
+
 
 
 
@@ -131,6 +147,18 @@ def main():
     if not RESULTS_DIR.exists():
         print(f"[ERROR] Paste '{RESULTS_DIR}' not found.")
         return
+ 
+
+    # with open(RESULTS_DIR / "metrics.csv", 'w', newline='', encoding='utf-8') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow([
+    #         "patient", "mechanism", "rate", "accuracy", 
+    #         "precision_warning", "precision_alert", 
+    #         "recall_warning", "recall_alert", "recall_both"
+    #     ])
+
+    metrics_list = []
+    
  
     # descobre todos os pacientes automaticamente
     patients = sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir())
@@ -160,6 +188,7 @@ def main():
  
         # descobre mecanismos e taxas automaticamente pela estrutura de pastas
         mechanisms = sorted(m for m in missing_root.iterdir() if m.is_dir())
+
  
         blocos_relatorio = []
  
@@ -188,6 +217,30 @@ def main():
                 blocos_relatorio.append(
                     formatar_relatorio(patient_id, mecanismo, rate, matriz, mc)
                 )
+
+                # # salva métricas no CSV
+                # with open(RESULTS_DIR / "metrics.csv", 'a', newline='', encoding='utf-8') as file:
+                #     writer = csv.writer(file)
+                #     writer.writerow([
+                #         patient_id, mecanismo, rate, 
+                #         format(mc['accuracy']), 
+                #         format(mc['precision_warning']), format(mc['precision_alert']), 
+                #         format(mc['recall_warning']), format(mc['recall_alert']), format(mc['recall_both'])
+                #     ])
+
+                metrics_list.append({
+                    "patient": patient_id,
+                    "mechanism": mecanismo,
+                    "rate": rate,
+                    "accuracy": mc['accuracy'],
+                    "precision_warning": mc['precision_warning'],
+                    "precision_alert": mc['precision_alert'],
+                    "recall_warning": mc['recall_warning'],
+                    "recall_alert": mc['recall_alert'],
+                    "recall_both": mc['recall_both']
+                })
+
+                
  
         # salva txt na pasta do paciente dentro de results/
         if blocos_relatorio:
@@ -197,6 +250,10 @@ def main():
                 f.write("=" * 60 + "\n\n")
                 f.write("\n\n".join(blocos_relatorio))
             print(f"\n  Salvo em: {txt_path}")
+
+    df = pd.DataFrame(metrics_list)
+    df.to_csv(RESULTS_DIR / "metrics.csv", index=False)
+    plot(df)
  
     print(f"\n{'='*60}")
     print("Concluido.")
