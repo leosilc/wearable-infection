@@ -18,9 +18,10 @@ MISSING_DIR = Path("data/missing")
 RESULTS_DIR = Path("results")
 
 # Taxas de ausência que serão geradas
-RATES = [20]
+RATES = [50]
 
 SEED = 42
+np.random.seed(SEED)
 
 # Nome da coluna que receberá os dados ausentes
 HR_COLUMN = "HR_Value"
@@ -67,21 +68,31 @@ def mar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
 
     df_out[time_column] = pd.to_datetime(df_out[time_column])
 
+    df_out["time"] = pd.to_datetime(df_out[time_column]).dt.time
+
     # Cria uma série indicadora para a noite (1 para noite, 0 para dia)
-    hours = df_out[time_column].dt.hour
+    # hours = df_out[time_column].dt.hour
     
     # Cria a coluna indicadora de noite DENTRO do DataFrame para compor o X
-    df_out['is_night'] = ((hours >= 22) | (hours < 6)).astype(int)
+    # df_out['is_night'] = ((hours >= 0) | (hours < 6)).astype(int)
 
     # X agora recebe DUAS colunas: quem vai sumir (HR) e quem causa o sumiço (is_night)
-    X = df_out[[HR_COLUMN, 'is_night']].astype(float)
+    # X = df_out[[HR_COLUMN, 'is_night']].astype(float)
+
+    print(df_out[["time", HR_COLUMN]].head())  # Verificar as primeiras linhas para garantir que as colunas estão corretas
+
+    
+
+    X = df_out[["time",HR_COLUMN]]
+
+    # print(X.head())  # Verificar as primeiras linhas de X para garantir que está correto
     
     # y volta a ser um array neutro, pois a mdatagen usa o X para a lógica MAR
     y = np.zeros(len(X))
 
     # Instancia o gerador apontando x_obs para a nova coluna do X
-    generator = uMAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN, x_obs='is_night')
-    X_with_missing = generator.rank()
+    generator = uMAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN, x_obs="time")
+    X_with_missing = generator.lowest()
 
     # Atualiza a coluna no DataFrame principal
     df_out[HR_COLUMN] = X_with_missing[HR_COLUMN].values
@@ -289,15 +300,15 @@ def main():
 
         for rate in RATES:
     
-            df_mcar = process_patient(patient_id, input_csv, "MCAR", rate)
+            # df_mcar = process_patient(patient_id, input_csv, "MCAR", rate)
             df_mar = process_patient(patient_id, input_csv, "MAR", rate)
 
             fig, axes = plt.subplots(1, 3, figsize=(15, 6))
         
             # 1. Plot MCAR (Verde) no primeiro espaço (axes[0])
             # Usamos sparkline=False para evitar bugs de layout quando colocados lado a lado
-            msno.matrix(df_mcar[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2))
-            axes[0].set_title("MCAR", fontsize=16)
+            # msno.matrix(df_mcar[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2))
+            # axes[0].set_title("MCAR", fontsize=16)
             
             # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
             msno.matrix(df_mar[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2))

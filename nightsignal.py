@@ -100,6 +100,9 @@ if(device=="Fitbit"):
             rec_time = rec_datetime.split(" ")[1]
             rec_hr = record_elements[1]
             rec_st = record_elements[3].strip(' \t\n\r')
+
+            # 00h às 06h e sem passos
+
             if (rec_st == "0" and ((" 00:" in rec_datetime) or (" 01:" in rec_datetime) or (" 02:" in rec_datetime) or (" 03:" in rec_datetime) or (" 04:" in rec_datetime) or (" 05:" in rec_datetime) or (" 06:" in rec_datetime)) ):
                 if (rec_date not in date_hrs_dic):
                     date_hrs_dic[rec_date] = rec_hr
@@ -126,7 +129,7 @@ if(device=="Fitbit"):
             if hr.strip() not in ('', 'nan', 'NaN')
         ]
         if not valid_hrs:
-            print(f"  [AVISO] Data {key} tem apenas valores ausentes ou inválidos. Ignorando esta data para cálculo de média.")
+            print(f"  [WARNING] In date {key}, there are only missing or invalid values. Skipping this date for average calculation.")
             continue
         AVGHR = int(sum(valid_hrs) / len(valid_hrs))
 
