@@ -13,7 +13,7 @@ def load_results(json_file):
     with open(json_file, 'r') as file:
         data = json.load(file)
         if file:
-            print(f"Dados carregados com sucesso de {json_file}")
+            print(f"Data successfully loaded from {json_file}")
     return {
         " ".join(entry["date"].split()): entry["val"]
         for entry in data["nightsignal"]
@@ -22,7 +22,7 @@ def load_results(json_file):
 def metrics(original: dict[str, str], missing: dict[str, str]) -> tuple[list[list[list[str]]], dict[str, str]]:
     matriz = [[[] for _ in range(3)] for _ in range(3)] # matriz 3x3 com listas vazias para armazenar as datas
 
-    dates = set(original.keys()) 
+    dates = set(original.keys()) & set(missing.keys())
     metrics_calculated = {
         "precision_warning": 0,
         "precision_alert": 0,
@@ -75,53 +75,52 @@ def format(val) -> str:
     return f"{val:.4f}"
  
  # apenas para visualizar e testar
-def formatar_relatorio(
+def format_report(
     patient_id: str,
-    mecanismo: str,
-    taxa: str,
+    mechanism: str,
+    rate: str,
     matriz: list[list[list[str]]],
     mc: dict,
 ) -> str:
-    labels = ["Verde (0)", "Amarelo (1)", "Vermelho (2)"]
-    linhas = []
+    labels = ["Green (0)", "Yellow (1)", "Red (2)"]
+    rows = []
  
-    linhas.append(f"Paciente : {patient_id}")
-    linhas.append(f"Mecanismo: {mecanismo}  |  Taxa: {taxa}")
-    linhas.append("")
+    rows.append(f"Patient : {patient_id}")
+    rows.append(f"Mechanism: {mechanism}  |  Rate: {rate}")
+    rows.append("")
  
-    linhas.append("Matriz de Confusao (linhas=original, colunas=com ausencia):")
+    rows.append("Confusion Matrix (rows=original, columns=with missing data):")
     header = f"{'':>14}" + "".join(f"{l:>14}" for l in labels)
-    linhas.append(header)
+    rows.append(header)
     for i, row in enumerate(matriz):
         counts = "".join(f"{len(cell):>14}" for cell in row)
-        linhas.append(f"{labels[i]:>14}{counts}")
-    linhas.append("")
+        rows.append(f"{labels[i]:>14}{counts}")
+    rows.append("")
  
-    linhas.append("Metricas:")
-    linhas.append(f"  Acuracia           : {format(mc['accuracy'])}"
-                  "  (diagonal / total excluindo verde->verde)")
-    linhas.append(f"  Precisao Amarelo   : {format(mc['precision_warning'])}")
-    linhas.append(f"  Precisao Vermelho  : {format(mc['precision_alert'])}")
-    linhas.append(f"  Recall Amarelo     : {format(mc['recall_warning'])}")
-    linhas.append(f"  Recall Vermelho    : {format(mc['recall_alert'])}")
-    linhas.append(f"  Recall Ambos       : {format(mc['recall_both'])}")
+    rows.append("Metrics:")
+    rows.append(f"  Accuracy           : {format(mc['accuracy'])}")
+    rows.append(f"  Precision Yellow   : {format(mc['precision_warning'])}")
+    rows.append(f"  Precision Red      : {format(mc['precision_alert'])}")
+    rows.append(f"  Recall Yellow      : {format(mc['recall_warning'])}")
+    rows.append(f"  Recall Red         : {format(mc['recall_alert'])}")
+    rows.append(f"  Recall Both        : {format(mc['recall_both'])}")
  
-    perdidos_alerta  = matriz[2][0]
-    perdidos_warning = matriz[1][0]
-    novos_falsos     = matriz[0][1] + matriz[0][2]
+    lost_red_alerts  = matriz[2][0]
+    lost_yellow_warnings = matriz[1][0]
+    new_false_alerts     = matriz[0][1] + matriz[0][2]
  
-    if perdidos_alerta:
-        linhas.append(f"\n  CRITICO - Alertas vermelhos perdidos ({len(perdidos_alerta)} dia(s)):")
-        linhas.append("    " + ", ".join(sorted(perdidos_alerta)))
-    if perdidos_warning:
-        linhas.append(f"\n  Avisos amarelos perdidos ({len(perdidos_warning)} dia(s)):")
-        linhas.append("    " + ", ".join(sorted(perdidos_warning)))
-    if novos_falsos:
-        linhas.append(f"\n  Alertas falsos novos ({len(novos_falsos)} dia(s)):")
-        linhas.append("    " + ", ".join(sorted(novos_falsos)))
+    if lost_red_alerts:
+        rows.append(f"\n  CRITICAL - Lost red alerts ({len(lost_red_alerts)} day(s)):")
+        rows.append("    " + ", ".join(sorted(lost_red_alerts)))
+    if lost_yellow_warnings:
+        rows.append(f"\n  Lost yellow alerts ({len(lost_yellow_warnings)} day(s)):")
+        rows.append("    " + ", ".join(sorted(lost_yellow_warnings)))
+    if new_false_alerts:
+        rows.append(f"\n  New false alerts ({len(new_false_alerts)} day(s)):")
+        rows.append("    " + ", ".join(sorted(new_false_alerts)))
  
-    linhas.append("\n" + "-" * 60)
-    return "\n".join(linhas)
+    rows.append("\n" + "-" * 60)
+    return "\n".join(rows)
 
 def plot(df: pd.DataFrame):
     # plotar o boxplot de cada paciente, comparando as métricas entre os mecanismos e taxas
@@ -131,21 +130,21 @@ def plot(df: pd.DataFrame):
     # Adiciona os pontinhos de cada paciente para mostrar a dispersão
     sns.stripplot(data=df, x="rate", y="accuracy", color="black", alpha=0.3)
 
-    plt.title("NightSignal...")
-    plt.ylabel("Acurácia (0.0 a 1.0)")
-    plt.xlabel("Taxa de Dados Faltantes")
-    plt.ylim(0, 1.05) # Garante que o gráfico mostre de 0 a 100%
-    
-    plt.savefig("grafico_acuracia.png")
+    plt.title("NightSignal — Accuracy by Missing Data Rate")
+    plt.ylabel("Accuracy (0.0 to 1.0)")
+    plt.xlabel("Missing Data Rate")
+    plt.ylim(0, 1.05)
+ 
+    plt.savefig("accuracy_plot.png")
     plt.show()
-    
+ 
 
 
 
 
 def main():
     if not RESULTS_DIR.exists():
-        print(f"[ERROR] Paste '{RESULTS_DIR}' not found.")
+        print(f"[ERROR] Folder '{RESULTS_DIR}' not found.")
         return
  
 
@@ -169,19 +168,19 @@ def main():
  
     print(f"\nFounded patients: {[p.name for p in patients]}\n")
  
-    for paste_paciente in patients:
-        patient_id = paste_paciente.name
+    for patient_folder in patients:
+        patient_id = patient_folder.name
  
-        json_original = paste_paciente / f"{patient_id}_signals.json"
+        json_original = patient_folder / f"{patient_id}_signals.json"
         if not json_original.exists():
             print(f"[WARNING] {patient_id}: JSON original not found, skipping.")
             continue
  
         original = load_results(json_original)
         print(f"{'='*60}")
-        print(f"Paciente: {patient_id}  ({len(original)} days on original data)")
+        print(f"Patient: {patient_id}  ({len(original)} days on original data)")
  
-        missing_root = paste_paciente / "missing"
+        missing_root = patient_folder / "missing"
         if not missing_root.exists():
             print(f"  There is not 'missing/', skipping.\n")
             continue
@@ -190,39 +189,40 @@ def main():
         mechanisms = sorted(m for m in missing_root.iterdir() if m.is_dir())
 
  
-        blocos_relatorio = []
+        report_blocks = []
  
-        for paste_mec in mechanisms:
-            mecanismo = paste_mec.name
-            rates = sorted(t for t in paste_mec.iterdir() if t.is_dir())
+        for mechanism_folder in mechanisms:
+            mechanism = mechanism_folder.name
+            rates = sorted(t for t in mechanism_folder.iterdir() if t.is_dir())
  
-            for paste_rate in rates:
-                rate = paste_rate.name
+            for rate_folder in rates:
+                rate = rate_folder.name
  
-                json_deg = paste_rate / f"{patient_id}_signals.json"
+                json_deg = rate_folder / f"{patient_id}_signals.json"
                 if not json_deg.exists():
-                    print(f"  [{mecanismo}/{rate}] JSON nao encontrado, pulando.")
+                    print(f"  [{mechanism}/{rate}] JSON nao encontrado, pulando.")
                     continue
  
                 missing = load_results(json_deg)
                 matriz, mc = metrics(original, missing)
  
-                print(f"\n  [{mecanismo}] Taxa: {rate}")
-                print(f"    Acuracia         : {format(mc['accuracy'])}")
-                print(f"    Precisao Amarelo : {format(mc['precision_warning'])}")
-                print(f"    Precisao Vermelho: {format(mc['precision_alert'])}")
-                print(f"    Recall Amarelo   : {format(mc['recall_warning'])}")
-                print(f"    Recall Vermelho  : {format(mc['recall_alert'])}")
- 
-                blocos_relatorio.append(
-                    formatar_relatorio(patient_id, mecanismo, rate, matriz, mc)
+                print(f"\n  [{mechanism}] Rate: {rate}")
+                print(f"    Accuracy         : {format(mc['accuracy'])}")
+                print(f"    Yellow Precision : {format(mc['precision_warning'])}")
+                print(f"    Red Precision    : {format(mc['precision_alert'])}")
+                print(f"    Yellow Recall    : {format(mc['recall_warning'])}")
+                print(f"    Red Recall       : {format(mc['recall_alert'])}")
+
+
+                report_blocks.append(
+                    format_report(patient_id, mechanism, rate, matriz, mc)
                 )
 
                 # # salva métricas no CSV
                 # with open(RESULTS_DIR / "metrics.csv", 'a', newline='', encoding='utf-8') as file:
                 #     writer = csv.writer(file)
                 #     writer.writerow([
-                #         patient_id, mecanismo, rate, 
+                #         patient_id, mechanism, rate, 
                 #         format(mc['accuracy']), 
                 #         format(mc['precision_warning']), format(mc['precision_alert']), 
                 #         format(mc['recall_warning']), format(mc['recall_alert']), format(mc['recall_both'])
@@ -230,7 +230,7 @@ def main():
 
                 metrics_list.append({
                     "patient": patient_id,
-                    "mechanism": mecanismo,
+                    "mechanism": mechanism,
                     "rate": rate,
                     "accuracy": mc['accuracy'],
                     "precision_warning": mc['precision_warning'],
@@ -243,13 +243,13 @@ def main():
                 
  
         # salva txt na pasta do paciente dentro de results/
-        if blocos_relatorio:
-            txt_path = paste_paciente / f"{patient_id}_metrics.txt"
+        if report_blocks:
+            txt_path = patient_folder / f"{patient_id}_metrics.txt"
             with open(txt_path, "w", encoding="utf-8") as f:
-                f.write(f"RELATORIO DE METRICAS — {patient_id}\n")
+                f.write(f"METRICS REPORT — {patient_id}\n")
                 f.write("=" * 60 + "\n\n")
-                f.write("\n\n".join(blocos_relatorio))
-            print(f"\n  Salvo em: {txt_path}")
+                f.write("\n\n".join(report_blocks))
+            print(f"\n  Saved in: {txt_path}")
 
     df = pd.DataFrame(metrics_list)
     df.to_csv(RESULTS_DIR / "metrics.csv", index=False)
