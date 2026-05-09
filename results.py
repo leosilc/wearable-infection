@@ -137,9 +137,94 @@ def plot(df: pd.DataFrame):
  
     plt.savefig("accuracy_plot.png")
     plt.show()
- 
 
 
+def plot_per_patient_metrics(metrics_csv: Path):
+    """
+    Cria gráficos para cada paciente mostrando cada métrica.
+    Para cada métrica, mostra linhas para MCAR, MAR e MNAR com erro bar.
+    Eixo X: taxa de dados faltantes (5, 10, 20)
+    Eixo Y: valor da métrica
+    """
+    
+    # Carrega o CSV
+    if not metrics_csv.exists():
+        print(f"[ERROR] Metrics CSV not found at {metrics_csv}")
+        return
+    
+    df = pd.read_csv(metrics_csv)
+    print(f"\nLoaded {len(df)} rows from metrics.csv")
+    
+    # Cria pasta para gráficos se não existir
+    plots_dir = RESULTS_DIR / "plots"
+    plots_dir.mkdir(exist_ok=True)
+    
+    # Lista de métricas (todas as colunas que terminam com "_mean")
+    metric_cols = [col.replace("_mean", "") for col in df.columns if col.endswith("_mean")]
+    print(f"Found metrics: {metric_cols}\n")
+    
+    # Extrai taxa em forma numérica (5, 10, 20 de "5pct", "10pct", "20pct")
+    df['rate_numeric'] = df['rate'].str.replace('pct', '').astype(int)
+    
+    # Para cada paciente
+    for patient_id in df['patient'].unique():
+        patient_df = df[df['patient'] == patient_id].copy()
+        patient_dir = plots_dir / patient_id
+        patient_dir.mkdir(exist_ok=True)
+        
+        print(f"Creating plots for patient: {patient_id}")
+        
+        # Para cada métrica
+        for metric in metric_cols:
+            metric_col = f"{metric}_mean"
+            metric_std_col = f"{metric}_std"
+            
+            # Verifica se as colunas existem
+            if metric_col not in patient_df.columns or metric_std_col not in patient_df.columns:
+                continue
+            
+            # Cria figura
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Para cada mecanismo (MCAR, MAR, MNAR)
+            mechanisms = patient_df['mechanism'].unique()
+            colors = {'MCAR': '#1f77b4', 'MAR': '#ff7f0e', 'MNAR': '#2ca02c'}
+            markers = {'MCAR': 'o', 'MAR': 's', 'MNAR': '^'}
+            
+            for mechanism in sorted(mechanisms):
+                mech_data = patient_df[patient_df['mechanism'] == mechanism].sort_values('rate_numeric')
+                
+                if len(mech_data) > 0:
+                    ax.errorbar(
+                        mech_data['rate_numeric'],
+                        mech_data[metric_col],
+                        yerr=mech_data[metric_std_col],
+                        marker=markers.get(mechanism, 'o'),
+                        label=mechanism,
+                        color=colors.get(mechanism),
+                        linewidth=2,
+                        markersize=8,
+                        capsize=5,
+                        capthick=2,
+                        alpha=0.8
+                    )
+            
+            # Formatação
+            ax.set_xlabel('Missing Data Rate (%)', fontsize=12, fontweight='bold')
+            ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=12, fontweight='bold')
+            ax.set_title(f'Patient {patient_id} - {metric.replace("_", " ").title()}', fontsize=14, fontweight='bold')
+            ax.set_xticks(sorted(patient_df['rate_numeric'].unique()))
+            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.legend(loc='best', fontsize=11)
+            ax.set_ylim(0, 1.05)
+            
+            # Salva figura
+            metric_filename = metric.replace(' ', '_').lower()
+            output_path = patient_dir / f"{metric_filename}.png"
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"  ✓ Saved: {output_path}")
+            plt.close()
 
 
 def main():
@@ -307,6 +392,11 @@ def main():
 
     grouped.to_csv(RESULTS_DIR / "metrics.csv", index=False)
     plot(grouped)
+    
+    # Gera gráficos individuais por paciente
+    print(f"\n{'='*60}")
+    print("Generating per-patient metric plots...")
+    plot_per_patient_metrics(RESULTS_DIR / "metrics.csv")
  
     print(f"\n{'='*60}")
     print("Concluido.")
