@@ -125,13 +125,13 @@ def format_report(
 def plot(df: pd.DataFrame):
     # plotar o boxplot de cada paciente, comparando as métricas entre os mecanismos e taxas
 
-    sns.boxplot(data=df, x="rate", y="accuracy", palette="viridis")
+    sns.boxplot(data=df, x="rate", y="accuracy_mean", palette="viridis")
     
     # Adiciona os pontinhos de cada paciente para mostrar a dispersão
-    sns.stripplot(data=df, x="rate", y="accuracy", color="black", alpha=0.3)
+    sns.stripplot(data=df, x="rate", y="accuracy_mean", color="black", alpha=0.3)
 
     plt.title("NightSignal — Accuracy by Missing Data Rate")
-    plt.ylabel("Accuracy (0.0 to 1.0)")
+    plt.ylabel("Mean Accuracy (0.0 to 1.0)")
     plt.xlabel("Missing Data Rate")
     plt.ylim(0, 1.05)
  
@@ -193,30 +193,54 @@ def main():
  
         for mechanism_folder in mechanisms:
             mechanism = mechanism_folder.name
-            rates = sorted(t for t in mechanism_folder.iterdir() if t.is_dir())
+            rates = sorted(
+                (t for t in mechanism_folder.iterdir() if t.is_dir()),
+                key=lambda folder: int(folder.name.replace("pct", "")),
+            )
  
             for rate_folder in rates:
                 rate = rate_folder.name
- 
-                json_deg = rate_folder / f"{patient_id}_signals.json"
-                if not json_deg.exists():
+
+                direct_json = rate_folder / f"{patient_id}_signals.json"
+                if direct_json.exists():
+                    runs = [("", direct_json)]
+                else:
+                    seed_folders = sorted(
+                        (s for s in rate_folder.iterdir() if s.is_dir()),
+                        key=lambda folder: int(folder.name),
+                    )
+                    runs = [
+                        (seed_folder.name, seed_folder / f"{patient_id}_signals.json")
+                        for seed_folder in seed_folders
+                    ]
+
+                if not runs:
                     print(f"  [{mechanism}/{rate}] JSON nao encontrado, pulando.")
                     continue
- 
-                missing = load_results(json_deg)
-                matriz, mc = metrics(original, missing)
- 
-                print(f"\n  [{mechanism}] Rate: {rate}")
-                print(f"    Accuracy         : {format(mc['accuracy'])}")
-                print(f"    Yellow Precision : {format(mc['precision_warning'])}")
-                print(f"    Red Precision    : {format(mc['precision_alert'])}")
-                print(f"    Yellow Recall    : {format(mc['recall_warning'])}")
-                print(f"    Red Recall       : {format(mc['recall_alert'])}")
 
+                for seed, json_deg in runs:
+                    if not json_deg.exists():
+                        if seed:
+                            print(f"  [{mechanism}/{rate}/seed={seed}] JSON nao encontrado, pulando.")
+                        else:
+                            print(f"  [{mechanism}/{rate}] JSON nao encontrado, pulando.")
+                        continue
 
-                report_blocks.append(
-                    format_report(patient_id, mechanism, rate, matriz, mc)
-                )
+                    missing = load_results(json_deg)
+                    matriz, mc = metrics(original, missing)
+
+                    run_suffix = f" | seed={seed}" if seed else ""
+                    print(f"\n  [{mechanism}] Rate: {rate}{run_suffix}")
+                    print(f"    Accuracy         : {format(mc['accuracy'])}")
+                    print(f"    Yellow Precision : {format(mc['precision_warning'])}")
+                    print(f"    Red Precision    : {format(mc['precision_alert'])}")
+                    print(f"    Yellow Recall    : {format(mc['recall_warning'])}")
+                    print(f"    Red Recall       : {format(mc['recall_alert'])}")
+
+                    mechanism_report = mechanism if not seed else f"{mechanism} (seed {seed})"
+                    report_blocks.append(
+                        format_report(patient_id, mechanism_report, rate, matriz, mc)
+                    )
 
                 # # salva métricas no CSV
                 # with open(RESULTS_DIR / "metrics.csv", 'a', newline='', encoding='utf-8') as file:
@@ -228,17 +252,18 @@ def main():
                 #         format(mc['recall_warning']), format(mc['recall_alert']), format(mc['recall_both'])
                 #     ])
 
-                metrics_list.append({
-                    "patient": patient_id,
-                    "mechanism": mechanism,
-                    "rate": rate,
-                    "accuracy": mc['accuracy'],
-                    "precision_warning": mc['precision_warning'],
-                    "precision_alert": mc['precision_alert'],
-                    "recall_warning": mc['recall_warning'],
-                    "recall_alert": mc['recall_alert'],
-                    "recall_both": mc['recall_both']
-                })
+                    metrics_list.append({
+                        "patient": patient_id,
+                        "mechanism": mechanism,
+                        "seed": seed,
+                        "rate": rate,
+                        "accuracy": mc['accuracy'],
+                        "precision_warning": mc['precision_warning'],
+                        "precision_alert": mc['precision_alert'],
+                        "recall_warning": mc['recall_warning'],
+                        "recall_alert": mc['recall_alert'],
+                        "recall_both": mc['recall_both']
+                    })
 
                 
  
@@ -252,8 +277,36 @@ def main():
             print(f"\n  Saved in: {txt_path}")
 
     df = pd.DataFrame(metrics_list)
-    df.to_csv(RESULTS_DIR / "metrics.csv", index=False)
-    plot(df)
+
+    if df.empty:
+        print("[WARNING] No metrics were generated. Skipping CSV and plot.")
+        return
+
+    grouped = df.groupby(["patient", "mechanism", "rate"], as_index=False).agg(
+        n_runs=("accuracy", "size"),
+        accuracy_mean=("accuracy", "mean"),
+        accuracy_std=("accuracy", "std"),
+        precision_warning_mean=("precision_warning", "mean"),
+        precision_warning_std=("precision_warning", "std"),
+        precision_alert_mean=("precision_alert", "mean"),
+        precision_alert_std=("precision_alert", "std"),
+        recall_warning_mean=("recall_warning", "mean"),
+        recall_warning_std=("recall_warning", "std"),
+        recall_alert_mean=("recall_alert", "mean"),
+        recall_alert_std=("recall_alert", "std"),
+        recall_both_mean=("recall_both", "mean"),
+        recall_both_std=("recall_both", "std"),
+    )
+
+    # casos com desvio padrão vazio, em que só ocorreu uma execução
+    std_cols = [c for c in grouped.columns if c.endswith("_std")]
+    grouped[std_cols] = grouped[std_cols].fillna(0.0)
+
+    grouped["_rate_num"] = grouped["rate"].str.replace("pct", "", regex=False).astype(int)
+    grouped = grouped.sort_values(["patient", "mechanism", "_rate_num"]).drop(columns=["_rate_num"])
+
+    grouped.to_csv(RESULTS_DIR / "metrics.csv", index=False)
+    plot(grouped)
  
     print(f"\n{'='*60}")
     print("Concluido.")

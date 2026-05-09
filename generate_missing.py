@@ -19,10 +19,11 @@ MISSING_DIR = Path("data/missing")
 RESULTS_DIR = Path("results")
 
 # Taxas de ausência que serão geradas
-RATES = [70]
+RATES = [5,10,20]
+MCAR_SEEDS = range(1, 6)
 
-SEED = 42
-np.random.seed(SEED)
+
+# np.random.seed(SEED)
 
 # Nome da coluna que receberá os dados ausentes
 HR_COLUMN = "HR_Value"
@@ -103,7 +104,7 @@ def mar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
 
 
 
-def mcar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
+def mcar(df: pd.DataFrame, rate: int, seed: int) -> pd.DataFrame:
 
     # Recebe o DataFrame original e devolve uma CÓPIA com alguns valores de HR_Value substituídos por NaN, de forma completamente aleatória (MCAR).
 
@@ -127,7 +128,7 @@ def mcar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     # X = df_out[[HR_COLUMN]].astype(float)
     y = np.zeros(len(X))
 
-    generator = uMCAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN, seed=SEED)
+    generator = uMCAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN, seed=seed)
 
     X_with_missing = generator.random()
 
@@ -150,7 +151,13 @@ def mcar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
 
 
 
-def save_csv_missing(df: pd.DataFrame, patient_id: str, taxa: int, mechanism: str):
+def save_csv_missing(
+    df: pd.DataFrame,
+    patient_id: str,
+    taxa: int,
+    mechanism: str,
+    seed: int | None = None,
+):
     """
     Salva o CSV com ausências em data/missing/MCAR/{taxa}pct/{patient_id}/
 
@@ -163,7 +170,10 @@ def save_csv_missing(df: pd.DataFrame, patient_id: str, taxa: int, mechanism: st
 
     NaN é escrito como campo vazio ("") — padrão CSV para dado ausente.
     """
-    folder = MISSING_DIR / mechanism / f"{taxa}pct" / patient_id
+    folder = MISSING_DIR / mechanism / f"{taxa}pct"
+    if seed is not None:
+        folder = folder / str(seed)
+    folder = folder / patient_id
     folder.mkdir(parents=True, exist_ok=True)
 
     output_path = folder / f"{patient_id}_temp.csv"
@@ -178,7 +188,13 @@ def save_csv_missing(df: pd.DataFrame, patient_id: str, taxa: int, mechanism: st
     return output_path
 
 
-def process_patient(patient_id: str, input_csv: Path, mechanism: str, rate: int) -> pd.DataFrame:
+def process_patient(
+    patient_id: str,
+    input_csv: Path,
+    mechanism: str,
+    rate: int,
+    seed: int | None = None,
+) -> pd.DataFrame:
     """
     Fluxo completo para um paciente:
       1. Lê o CSV processado
@@ -200,15 +216,18 @@ def process_patient(patient_id: str, input_csv: Path, mechanism: str, rate: int)
 
 
     if mechanism == "MCAR":
-        missing_df = mcar(df, rate)
+        if seed is None:
+            raise ValueError("MCAR requires a seed value.")
+
+        missing_df = mcar(df, rate, seed=seed)
         nan_count = missing_df[HR_COLUMN].isna().sum()
         actual_rate = nan_count / total_rows * 100
-        output_path = save_csv_missing(missing_df, patient_id, rate, mechanism)
+        output_path = save_csv_missing(missing_df, patient_id, rate, mechanism, seed=seed)
 
-        print(f"  {mechanism} {rate:>2}%: {nan_count:>5} NaNs / {total_rows} linhas "
+        print(f"  {mechanism} seed={seed} {rate:>2}%: {nan_count:>5} NaNs / {total_rows} linhas "
             f"= {actual_rate:.1f}% real  →  {output_path}")
         print("Running NightSignal for this patient with missing data...")
-        run_patient_process(rate, patient_id, mechanism)
+        run_patient_process(rate, patient_id, mechanism, seed=seed)
 
     elif mechanism == "MAR":
         missing_df = mar(df, rate)
@@ -223,11 +242,13 @@ def process_patient(patient_id: str, input_csv: Path, mechanism: str, rate: int)
 
     return missing_df
 
-def run_patient_process(taxa: int, patient_id: str, mechanism: str):
+def run_patient_process(taxa: int, patient_id: str, mechanism: str, seed: int | None = None):
     print("Starting NightSignal processing...")
  
-
-    patient_dir = MISSING_DIR / mechanism / f"{taxa}pct" / patient_id
+    patient_dir = MISSING_DIR / mechanism / f"{taxa}pct"
+    if seed is not None:
+        patient_dir = patient_dir / str(seed)
+    patient_dir = patient_dir / patient_id
     
     if not os.path.exists(patient_dir):
         print(f"Folder not found: {patient_dir}. Skipping...")
@@ -238,6 +259,8 @@ def run_patient_process(taxa: int, patient_id: str, mechanism: str):
     
     # Define e cria a pasta de destino
     output_dir = RESULTS_DIR / patient_id / "missing" / mechanism / f"{taxa}pct"
+    if seed is not None:
+        output_dir = output_dir / str(seed)
     os.makedirs(output_dir, exist_ok=True)
 
     if os.path.exists(input_csv):
@@ -290,7 +313,7 @@ def main():
         return
 
     print(f"{'='*55}")
-    print(f"Generating MCAR missing data — rates: {RATES}%  |  seed: {SEED}") #ALTERAR
+    print(f"Generating MCAR missing data — rates: {RATES}%  |  seeds: {list(MCAR_SEEDS)}")
     print(f"{'='*55}")
 
     for patient_folder in patients:
@@ -302,40 +325,39 @@ def main():
             continue
 
         for rate in RATES:
-    
-            df_mcar = process_patient(patient_id, input_csv, "MCAR", rate)
             df_mar = process_patient(patient_id, input_csv, "MAR", rate)
-            
 
-            date_end = df_mcar['Datetime'].min() + pd.Timedelta(days=4)
-            df_mcar_final = df_mcar[df_mcar['Datetime'] < date_end].copy()
-            df_mar_final = df_mar[df_mar['Datetime'] < date_end].copy()
+            for seed in MCAR_SEEDS:
+                df_mcar = process_patient(patient_id, input_csv, "MCAR", rate, seed=seed)
 
-            df_mcar_final.set_index('Datetime', inplace=True)
-            df_mar_final.set_index('Datetime', inplace=True)
+                date_end = df_mcar['Datetime'].min() + pd.Timedelta(days=4)
+                df_mcar_final = df_mcar[df_mcar['Datetime'] < date_end].copy()
+                df_mar_final = df_mar[df_mar['Datetime'] < date_end].copy()
 
-            fig, axes = plt.subplots(1, 3, figsize=(15, 6))
-        
-            # 1. Plot MCAR (Verde) no primeiro espaço (axes[0])
-            # Usamos sparkline=False para evitar bugs de layout quando colocados lado a lado
-            msno.matrix(df_mcar_final[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2),freq='12h',fontsize=10)
-            axes[0].set_title("MCAR", fontsize=16)
+                df_mcar_final.set_index('Datetime', inplace=True)
+                df_mar_final.set_index('Datetime', inplace=True)
 
-       
-            
-            # # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
-            msno.matrix(df_mar_final[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2),freq='12h',fontsize=10)
-            axes[1].set_title("MAR", fontsize=16)
-            
-            
-            # Ajusta os espaçamentos para os títulos não encavalarem
-            plt.tight_layout()
-            
-            # SALVA O ARQUIVO: dpi=300 garante qualidade de artigo científico
-            plt.savefig(RESULTS_DIR/f"{patient_id}/{patient_id}_mm.png", dpi=300, bbox_inches='tight')
-            
-            # Exibe a imagem na tela para você conferir na hora
-            plt.show()
+                fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+                # 1. Plot MCAR (Verde) no primeiro espaço (axes[0])
+                # Usamos sparkline=False para evitar bugs de layout quando colocados lado a lado
+                msno.matrix(df_mcar_final[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2), freq='12h', fontsize=10)
+                axes[0].set_title(f"MCAR - {rate}pct - seed {seed}", fontsize=16)
+
+                # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
+                msno.matrix(df_mar_final[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2), freq='12h', fontsize=10)
+                axes[1].set_title(f"MAR - {rate}pct", fontsize=16)
+
+                # Ajusta os espaçamentos para os títulos não encavalarem
+                plt.tight_layout()
+
+                # Salva por taxa e seed para não sobrescrever resultados.
+                plot_dir = RESULTS_DIR / patient_id / "missing" / "MCAR" / f"{rate}pct" / str(seed)
+                plot_dir.mkdir(parents=True, exist_ok=True)
+                plt.savefig(plot_dir / f"{patient_id}_mm.png", dpi=300, bbox_inches='tight')
+
+                # Exibe a imagem na tela para você conferir na hora
+                plt.show()
 
 
 if __name__ == "__main__":
