@@ -11,6 +11,7 @@ import os
 import subprocess
 import missingno as msno
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 PROCESSING_DIR = Path("data/processing")
@@ -18,7 +19,7 @@ MISSING_DIR = Path("data/missing")
 RESULTS_DIR = Path("results")
 
 # Taxas de ausência que serão geradas
-RATES = [50]
+RATES = [70]
 
 SEED = 42
 np.random.seed(SEED)
@@ -64,29 +65,21 @@ HR_COLUMN = "HR_Value"
 def mar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     # Cria uma cópia do DataFrame original
     df_out = df.copy()
-    time_column = 'Datetime'
 
-    df_out[time_column] = pd.to_datetime(df_out[time_column])
+    # marca true para todos os horários dentro da madrugada
+    night_mask = df_out["Datetime"].dt.hour < 6
+    # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
+    df_night = df_out.loc[night_mask, ["Datetime", HR_COLUMN]].copy()
 
-    df_out["time"] = pd.to_datetime(df_out[time_column]).dt.time
-
-    # Cria uma série indicadora para a noite (1 para noite, 0 para dia)
-    # hours = df_out[time_column].dt.hour
-    
-    # Cria a coluna indicadora de noite DENTRO do DataFrame para compor o X
-    # df_out['is_night'] = ((hours >= 0) | (hours < 6)).astype(int)
-
-    # X agora recebe DUAS colunas: quem vai sumir (HR) e quem causa o sumiço (is_night)
-    # X = df_out[[HR_COLUMN, 'is_night']].astype(float)
-
-    print(df_out[["time", HR_COLUMN]].head())  # Verificar as primeiras linhas para garantir que as colunas estão corretas
+    # converte para minutos desde meia-noite — valor numérico que uMAR consegue rankear
+    df_night["time"] = (df_night["Datetime"].dt.hour * 60 + df_night["Datetime"].dt.minute)
 
     
 
-    X = df_out[["time",HR_COLUMN]]
+    # print(df_out[["time", HR_COLUMN]].head())  # Verificar as primeiras linhas para garantir que as colunas estão corretas
 
-    # print(X.head())  # Verificar as primeiras linhas de X para garantir que está correto
-    
+    X = df_night[["time",HR_COLUMN]]
+
     # y volta a ser um array neutro, pois a mdatagen usa o X para a lógica MAR
     y = np.zeros(len(X))
 
@@ -95,11 +88,14 @@ def mar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     X_with_missing = generator.lowest()
 
     # Atualiza a coluna no DataFrame principal
-    df_out[HR_COLUMN] = X_with_missing[HR_COLUMN].values
+    # df_out[HR_COLUMN] = X_with_missing[HR_COLUMN].values
 
     # Adiciona as colunas de referência originais para validação futura
     df_out["HR_MISSING"] = df[HR_COLUMN].astype(int)
     df_out["ST_MISSING"] = df["ST_Value"]
+
+    df_out.loc[night_mask, HR_COLUMN] = X_with_missing[HR_COLUMN].values
+
     df_out[HR_COLUMN] = df_out[HR_COLUMN].astype('Int64')
 
     return df_out
@@ -120,22 +116,31 @@ def mcar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     #   x_miss = nome da coluna que vai receber os NaNs
     #   seed 
 
-    X = df_out[[HR_COLUMN]].astype(float)
+    # marca true para todos os horários dentro da madrugada
+    night_mask = df_out["Datetime"].dt.hour < 6
+    # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
+    df_night = df_out.loc[night_mask, [HR_COLUMN]].copy()
+
+    X = df_night
+    # print(X.head())
+
+    # X = df_out[[HR_COLUMN]].astype(float)
     y = np.zeros(len(X))
 
     generator = uMCAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN, seed=SEED)
 
-    # .random() é o método que gera os NaNs e os RETORNA num novo DataFrame.
     X_with_missing = generator.random()
-
 
     #adicionando a coluna de Steps e Batimentos ao final
     df_out["HR_MISSING"] = df[HR_COLUMN].astype(int)  # cópia da coluna original para referência
     df_out["ST_MISSING"] = df["ST_Value"]#.astype(int) # se precisar ser float em algum momento
 
 
+    df_out.loc[night_mask, HR_COLUMN] = X_with_missing[HR_COLUMN].values
+
+
     # Substitui a coluna HR no DataFrame completo
-    df_out[HR_COLUMN] = X_with_missing[HR_COLUMN].values
+    # df_out[HR_COLUMN] = X_with_missing[HR_COLUMN].values
 
     # # Converte mantendo os NaN como nulos, mas tratando o resto como inteiro
     df_out[HR_COLUMN] = df_out[HR_COLUMN].astype('Int64')
@@ -278,16 +283,14 @@ def main():
     df_mar = pd.DataFrame()
 
     # Encontra todas as pastas de pacientes em data/processing/
-    patients = sorted(
-        p for p in PROCESSING_DIR.iterdir() if p.is_dir()
-    )
+    patients = sorted(p for p in PROCESSING_DIR.iterdir() if p.is_dir())
 
     if not patients:
         print(f"[WARNING] No patient folder found in {PROCESSING_DIR}.")
         return
 
     print(f"{'='*55}")
-    print(f"Generating MCAR missing data — rates: {RATES}%  |  seed: {SEED}")
+    print(f"Generating MCAR missing data — rates: {RATES}%  |  seed: {SEED}") #ALTERAR
     print(f"{'='*55}")
 
     for patient_folder in patients:
@@ -300,18 +303,28 @@ def main():
 
         for rate in RATES:
     
-            # df_mcar = process_patient(patient_id, input_csv, "MCAR", rate)
+            df_mcar = process_patient(patient_id, input_csv, "MCAR", rate)
             df_mar = process_patient(patient_id, input_csv, "MAR", rate)
+            
+
+            date_end = df_mcar['Datetime'].min() + pd.Timedelta(days=4)
+            df_mcar_final = df_mcar[df_mcar['Datetime'] < date_end].copy()
+            df_mar_final = df_mar[df_mar['Datetime'] < date_end].copy()
+
+            df_mcar_final.set_index('Datetime', inplace=True)
+            df_mar_final.set_index('Datetime', inplace=True)
 
             fig, axes = plt.subplots(1, 3, figsize=(15, 6))
         
             # 1. Plot MCAR (Verde) no primeiro espaço (axes[0])
             # Usamos sparkline=False para evitar bugs de layout quando colocados lado a lado
-            # msno.matrix(df_mcar[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2))
-            # axes[0].set_title("MCAR", fontsize=16)
+            msno.matrix(df_mcar_final[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2),freq='12h',fontsize=10)
+            axes[0].set_title("MCAR", fontsize=16)
+
+       
             
-            # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
-            msno.matrix(df_mar[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2))
+            # # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
+            msno.matrix(df_mar_final[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2),freq='12h',fontsize=10)
             axes[1].set_title("MAR", fontsize=16)
             
             
@@ -319,7 +332,7 @@ def main():
             plt.tight_layout()
             
             # SALVA O ARQUIVO: dpi=300 garante qualidade de artigo científico
-            plt.savefig("teste.png", dpi=300, bbox_inches='tight')
+            plt.savefig(RESULTS_DIR/f"{patient_id}/{patient_id}_mm.png", dpi=300, bbox_inches='tight')
             
             # Exibe a imagem na tela para você conferir na hora
             plt.show()
