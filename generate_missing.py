@@ -53,9 +53,11 @@ def mnar(df: pd.DataFrame, rate: int, seed: int) -> pd.DataFrame:
     # X = df_out[[HR_COLUMN]].astype(float)
     y = np.zeros(len(X))
 
-    generator = uMNAR(X=X, y=y, missing_rate=rate, x_miss=HR_COLUMN)
+    # threshold=1.0 + deterministic=True faz o gerador escolher apenas a cauda superior
+    # da ordenação de HR, ou seja, os maiores batimentos dentro da janela noturna.
+    generator = uMNAR(X=X, y=y, threshold=1.0, missing_rate=rate, x_miss=HR_COLUMN)
 
-    X_with_missing = generator.run(deterministic=False)
+    X_with_missing = generator.run(deterministic=True)
 
     #adicionando a coluna de Steps e Batimentos ao final
     df_out["HR_MISSING"] = df[HR_COLUMN].astype(int)  # cópia da coluna original para referência

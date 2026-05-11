@@ -231,15 +231,6 @@ def main():
     if not RESULTS_DIR.exists():
         print(f"[ERROR] Folder '{RESULTS_DIR}' not found.")
         return
- 
-
-    # with open(RESULTS_DIR / "metrics.csv", 'w', newline='', encoding='utf-8') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerow([
-    #         "patient", "mechanism", "rate", "accuracy", 
-    #         "precision_warning", "precision_alert", 
-    #         "recall_warning", "recall_alert", "recall_both"
-    #     ])
 
     metrics_list = []
     
@@ -327,15 +318,6 @@ def main():
                         format_report(patient_id, mechanism_report, rate, matriz, mc)
                     )
 
-                # # salva métricas no CSV
-                # with open(RESULTS_DIR / "metrics.csv", 'a', newline='', encoding='utf-8') as file:
-                #     writer = csv.writer(file)
-                #     writer.writerow([
-                #         patient_id, mechanism, rate, 
-                #         format(mc['accuracy']), 
-                #         format(mc['precision_warning']), format(mc['precision_alert']), 
-                #         format(mc['recall_warning']), format(mc['recall_alert']), format(mc['recall_both'])
-                #     ])
 
                     metrics_list.append({
                         "patient": patient_id,
