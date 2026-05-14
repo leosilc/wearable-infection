@@ -19,7 +19,7 @@ MISSING_DIR = Path("data/missing")
 RESULTS_DIR = Path("results")
 
 # Taxas de ausência que serão geradas
-RATES = [5,10,20]
+RATES = [5,10,15,20,25]
 MCAR_SEEDS = range(1, 6)
 
 
@@ -29,26 +29,25 @@ MCAR_SEEDS = range(1, 6)
 HR_COLUMN = "HR_Value"
 
 
-def mnar(df: pd.DataFrame, rate: int, seed: int) -> pd.DataFrame:
+def mnar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     
     df_out = df.copy()
 
-    if seed is not None:
-        np.random.seed(seed)
+
 
     # marca true para todos os horários dentro da madrugada
     night_mask = df_out["Datetime"].dt.hour < 6
     # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
     df_night = df_out.loc[night_mask, ["Datetime", HR_COLUMN]].copy().reset_index(drop=True)
 
-    # converte para minutos desde meia-noite — valor numérico que uMAR consegue rankear
-    df_night["time"] = (df_night["Datetime"].dt.hour * 60 + df_night["Datetime"].dt.minute)
+    # # converte para minutos desde meia-noite — valor numérico que uMAR consegue rankear
+    # df_night["time"] = (df_night["Datetime"].dt.hour * 60 + df_night["Datetime"].dt.minute)
 
     
 
     # print(df_out[["time", HR_COLUMN]].head())  # Verificar as primeiras linhas para garantir que as colunas estão corretas
 
-    X = df_night[["time", HR_COLUMN]].reset_index(drop=True)
+    X = df_night[[HR_COLUMN]].reset_index(drop=True)
 
     # X = df_out[[HR_COLUMN]].astype(float)
     y = np.zeros(len(X))
@@ -244,18 +243,16 @@ def process_patient(
         run_patient_process(rate, patient_id, mechanism, seed=seed)
 
     elif mechanism == "MNAR":
-        if seed is None:
-            raise ValueError("MNAR requires a seed value.")
 
-        missing_df = mnar(df, rate, seed=seed)
+        missing_df = mnar(df, rate)
         nan_count = missing_df[HR_COLUMN].isna().sum()
         actual_rate = nan_count / total_rows * 100
-        output_path = save_csv_missing(missing_df, patient_id, rate, mechanism, seed=seed)
+        output_path = save_csv_missing(missing_df, patient_id, rate, mechanism)
 
-        print(f"  {mechanism} seed={seed} {rate:>2}%: {nan_count:>5} NaNs / {total_rows} linhas "
+        print(f"  {mechanism} {rate:>2}%: {nan_count:>5} NaNs / {total_rows} linhas "
             f"= {actual_rate:.1f}% real  →  {output_path}")
         print("Running NightSignal for this patient with missing data...")
-        run_patient_process(rate, patient_id, mechanism, seed=seed)
+        run_patient_process(rate, patient_id, mechanism)
 
     elif mechanism == "MAR":
         missing_df = mar(df, rate)
@@ -355,11 +352,10 @@ def main():
 
         for rate in RATES:
             df_mar = process_patient(patient_id, input_csv, "MAR", rate)
+            df_mnar = process_patient(patient_id, input_csv, "MNAR", rate)
 
             for seed in MCAR_SEEDS:
                 df_mcar = process_patient(patient_id, input_csv, "MCAR", rate, seed=seed)
-                df_mnar = process_patient(patient_id, input_csv, "MNAR", rate, seed=seed)
-
 
                 date_end = df_mcar['Datetime'].min() + pd.Timedelta(days=4)
                 df_mcar_final = df_mcar[df_mcar['Datetime'] < date_end].copy()
@@ -374,22 +370,22 @@ def main():
 
                 # 1. Plot MCAR (Verde) no primeiro espaço (axes[0])
                 # Usamos sparkline=False para evitar bugs de layout quando colocados lado a lado
-                msno.matrix(df_mcar_final[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2), freq='12h', fontsize=10)
+                msno.matrix(df_mcar_final[[HR_COLUMN]], ax=axes[0], sparkline=False, color=(0.2, 0.8, 0.2), fontsize=10)
                 axes[0].set_title(f"MCAR - {rate}pct - seed {seed}", fontsize=16)
 
                 # 2. Plot MAR (Vermelho) no segundo espaço (axes[1])
-                msno.matrix(df_mar_final[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2), freq='12h', fontsize=10)
+                msno.matrix(df_mar_final[[HR_COLUMN]], ax=axes[1], sparkline=False, color=(0.8, 0.2, 0.2), fontsize=10)
                 axes[1].set_title(f"MAR - {rate}pct", fontsize=16)
 
                 # 3. Plot MNAR (Azul) no terceiro espaço (axes[2])
-                msno.matrix(df_mnar_final[[HR_COLUMN]], ax=axes[2], sparkline=False, color=(0.2, 0.2, 0.8), freq='12h', fontsize=10)
-                axes[2].set_title(f"MNAR - {rate}pct - seed {seed}", fontsize=16)
+                msno.matrix(df_mnar_final[[HR_COLUMN]], ax=axes[2], sparkline=False, color=(0.2, 0.2, 0.8), fontsize=10)
+                axes[2].set_title(f"MNAR - {rate}pct", fontsize=16)
 
                 # Ajusta os espaçamentos para os títulos não encavalarem
                 plt.tight_layout()
 
                 # Salva por taxa e seed para não sobrescrever resultados.
-                plot_dir = RESULTS_DIR / patient_id / "missing" / "MNAR" / f"{rate}pct" / str(seed)
+                plot_dir = RESULTS_DIR / patient_id / "missing" / "MCAR" / f"{rate}pct" / str(seed)
                 plot_dir.mkdir(parents=True, exist_ok=True)
                 plt.savefig(plot_dir / f"{patient_id}_mm.png", dpi=300, bbox_inches='tight')
 

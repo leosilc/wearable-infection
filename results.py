@@ -5,6 +5,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import csv
 
+# ALTERAR RECALL E PRECISÃO E CRIAR ACURÁCIA PARA ALERTA
+
 RESULTS_DIR = Path("results")
 MISSING_DIR = RESULTS_DIR / "missing" 
 
@@ -29,7 +31,7 @@ def metrics(original: dict[str, str], missing: dict[str, str]) -> tuple[list[lis
         "recall_warning": 0,
         "recall_alert": 0,
         "recall_both": 0,
-        "accuracy": 0
+        "accuracy_alert": 0
     }
 
     for date in dates:
@@ -60,8 +62,8 @@ def metrics(original: dict[str, str], missing: dict[str, str]) -> tuple[list[lis
     )
     
     
-    metrics_calculated["accuracy"] = safe_div(
-        len(matriz[1][1]) + len(matriz[2][2]),
+    metrics_calculated["accuracy_alert"] = safe_div(
+        len(matriz[2][2]),
         sum(len(matriz[i][j]) for i in range(3) for j in range(3)) - len(matriz[0][0]),
     )
 
@@ -98,7 +100,7 @@ def format_report(
     rows.append("")
  
     rows.append("Metrics:")
-    rows.append(f"  Accuracy           : {format(mc['accuracy'])}")
+    rows.append(f"  Accuracy Red           : {format(mc['accuracy_alert'])}")
     rows.append(f"  Precision Yellow   : {format(mc['precision_warning'])}")
     rows.append(f"  Precision Red      : {format(mc['precision_alert'])}")
     rows.append(f"  Recall Yellow      : {format(mc['recall_warning'])}")
@@ -125,17 +127,17 @@ def format_report(
 def plot(df: pd.DataFrame):
     # plotar o boxplot de cada paciente, comparando as métricas entre os mecanismos e taxas
 
-    sns.boxplot(data=df, x="rate", y="accuracy_mean", palette="viridis")
+    sns.boxplot(data=df, x="rate", y="accuracy_alert", palette="viridis")
     
     # Adiciona os pontinhos de cada paciente para mostrar a dispersão
-    sns.stripplot(data=df, x="rate", y="accuracy_mean", color="black", alpha=0.3)
+    sns.stripplot(data=df, x="rate", y="accuracy_alert", color="black", alpha=0.3)
 
     plt.title("NightSignal — Accuracy by Missing Data Rate")
     plt.ylabel("Mean Accuracy (0.0 to 1.0)")
     plt.xlabel("Missing Data Rate")
     plt.ylim(0, 1.05)
  
-    plt.savefig("accuracy_plot.png")
+    plt.savefig("accuracy_alert_plot.png")
     plt.show()
 
 
@@ -307,7 +309,7 @@ def main():
 
                     run_suffix = f" | seed={seed}" if seed else ""
                     print(f"\n  [{mechanism}] Rate: {rate}{run_suffix}")
-                    print(f"    Accuracy         : {format(mc['accuracy'])}")
+                    print(f"    Accuracy Alert         : {format(mc['accuracy_alert'])}")
                     print(f"    Yellow Precision : {format(mc['precision_warning'])}")
                     print(f"    Red Precision    : {format(mc['precision_alert'])}")
                     print(f"    Yellow Recall    : {format(mc['recall_warning'])}")
@@ -324,7 +326,7 @@ def main():
                         "mechanism": mechanism,
                         "seed": seed,
                         "rate": rate,
-                        "accuracy": mc['accuracy'],
+                        "accuracy_alert": mc['accuracy_alert'],
                         "precision_warning": mc['precision_warning'],
                         "precision_alert": mc['precision_alert'],
                         "recall_warning": mc['recall_warning'],
@@ -350,9 +352,9 @@ def main():
         return
 
     grouped = df.groupby(["patient", "mechanism", "rate"], as_index=False).agg(
-        n_runs=("accuracy", "size"),
-        accuracy_mean=("accuracy", "mean"),
-        accuracy_std=("accuracy", "std"),
+        n_runs=("accuracy_alert", "size"),
+        accuracy_mean=("accuracy_alert", "mean"),
+        accuracy_std=("accuracy_alert", "std"),
         precision_warning_mean=("precision_warning", "mean"),
         precision_warning_std=("precision_warning", "std"),
         precision_alert_mean=("precision_alert", "mean"),

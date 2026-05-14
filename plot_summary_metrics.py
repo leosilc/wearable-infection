@@ -33,6 +33,12 @@ def metric_columns(df: pd.DataFrame) -> list[str]:
     return metrics
 
 
+def confidence_interval_half_width(df: pd.DataFrame, metric: str) -> pd.Series:
+    sample_size = df["n_patients"].clip(lower=1)
+    standard_error = df[f"{metric}_std"] / sample_size.pow(0.5)
+    return 1.96 * standard_error
+
+
 def plot_metric(df: pd.DataFrame, metric: str) -> None:
     fig, ax = plt.subplots(figsize=(9, 5.5))
 
@@ -49,6 +55,7 @@ def plot_metric(df: pd.DataFrame, metric: str) -> None:
             mech_data["rate_num"],
             mech_data[f"{metric}_mean"],
             yerr=mech_data[f"{metric}_std"],
+            # yerr=confidence_interval_half_width(mech_data, metric),
             label=mechanism,
             color=palette.get(mechanism, None),
             marker=markers.get(mechanism, "o"),

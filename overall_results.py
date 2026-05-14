@@ -43,14 +43,17 @@ def metrics_from_matrix(matrix: list[list[int]]) -> dict[str, float]:
     safe_div = lambda num, den: num / den if den else 0
 
     return {
-        "precision_warning": safe_div(matrix[1][1], sum(matrix[1][j] for j in range(3))),
-        "precision_alert": safe_div(matrix[2][2], sum(matrix[2][j] for j in range(3))),
-        "recall_warning": safe_div(matrix[1][1], sum(matrix[i][1] for i in range(3))),
-        "recall_alert": safe_div(matrix[2][2], sum(matrix[i][2] for i in range(3))),
-        "recall_both": safe_div(matrix[1][0] + matrix[2][0], matrix[1][1] + matrix[2][2]),
-        "accuracy": safe_div(
-            matrix[1][1] + matrix[2][2],
-            sum(matrix[i][j] for i in range(3) for j in range(3)) - matrix[0][0],
+        "recall_warning": safe_div(matrix[1][1], sum(matrix[1][j] for j in range(3))),
+        "recall_alert": safe_div(matrix[2][2], sum(matrix[2][j] for j in range(3))),
+        "precision_warning": safe_div(matrix[1][1], sum(matrix[i][1] for i in range(3))),
+        "precision_alert": safe_div(matrix[2][2], sum(matrix[i][2] for i in range(3))),
+        "accuracy_alert": safe_div(
+            matrix[2][2],
+            sum(matrix[i][2] for i in range(3)) + sum(matrix[2][j] for j in range(3)) - matrix[2][2],
+        ),
+        "accuracy_warning": safe_div(
+            matrix[1][1],
+            sum(matrix[i][1] for i in range(3)) + sum(matrix[1][j] for j in range(3)) - matrix[1][1],
         ),
     }
 
@@ -178,12 +181,12 @@ def main() -> None:
 
     # Calculate mean and std of metrics by mechanism and rate from patient-level values
     metric_cols = [
-        "accuracy",
+        "accuracy_alert",
+        "accuracy_warning",
         "precision_warning",
         "precision_alert",
         "recall_warning",
         "recall_alert",
-        "recall_both",
     ]
 
     summary_rows = []
