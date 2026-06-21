@@ -12,3 +12,5 @@ teste_mdatagen/
 # Arquivos de sistema e cache (recomendado adicionar)
 __pycache__/
 *.pyc
+
+moving_dataseets.py
