@@ -28,6 +28,12 @@ PALETTE = {
     "MNAR": "#0173b2",
 }
 
+METRIC_LABELS_PT = {
+    "accuracy": "Acurácia",
+    "precision": "Precisão",
+    "recall": "Revocação",
+}
+
 
 def load_patient_metrics(csv_path: Path) -> pd.DataFrame:
     if not csv_path.exists():
@@ -79,10 +85,11 @@ def plot_metrics_group(df: pd.DataFrame, metrics: list[str], group_type: str) ->
             ax=ax,
         )
         
-        ax.set_xlabel("Mechanism")
-        metric_label = metric.replace(f"_{group_type}", "").replace("_", " ").title()
+        ax.set_xlabel("Mecanismo")
+        metric_key = metric.replace(f"_{group_type}", "")
+        metric_label = METRIC_LABELS_PT.get(metric_key, metric_key.replace("_", " ").title())
         ax.set_ylabel(metric_label)
-        ax.set_ylim(0, 1.05)
+        ax.set_ylim(-0.1, 1.05)
         ax.grid(True, alpha=0.25, linestyle="--")
         ax.get_legend().remove()
 
@@ -91,7 +98,7 @@ def plot_metrics_group(df: pd.DataFrame, metrics: list[str], group_type: str) ->
     fig.legend(
         handles,
         labels,
-        title="Missing Rate",
+        title="Taxa de Ausência",
         loc="upper center",
         bbox_to_anchor=(0.5, 1.05),
         ncol=len(rate_labels),

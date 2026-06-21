@@ -1,6 +1,7 @@
 # Dados (pastas com datasets)
 data/
 results/
+nused/
 
 # Ambiente virtual
 teste_mdatagen/

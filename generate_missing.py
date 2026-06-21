@@ -36,7 +36,7 @@ def mnar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
 
 
     # marca true para todos os horários dentro da madrugada
-    night_mask = df_out["Datetime"].dt.hour < 6
+    night_mask = df_out["Datetime"].dt.hour < 7
     # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
     df_night = df_out.loc[night_mask, ["Datetime", HR_COLUMN]].copy().reset_index(drop=True)
 
@@ -81,7 +81,7 @@ def mar(df: pd.DataFrame, rate: int) -> pd.DataFrame:
     df_out = df.copy()
 
     # marca true para todos os horários dentro da madrugada
-    night_mask = df_out["Datetime"].dt.hour < 6
+    night_mask = df_out["Datetime"].dt.hour < 7
     # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
     df_night = df_out.loc[night_mask, ["Datetime", HR_COLUMN]].copy()
 
@@ -131,7 +131,7 @@ def mcar(df: pd.DataFrame, rate: int, seed: int) -> pd.DataFrame:
     #   seed 
 
     # marca true para todos os horários dentro da madrugada
-    night_mask = df_out["Datetime"].dt.hour < 6
+    night_mask = df_out["Datetime"].dt.hour < 7
     # cria cópia do df apenas pegando os horários acima e selecionando apenas o HR
     df_night = df_out.loc[night_mask, [HR_COLUMN]].copy()
 
